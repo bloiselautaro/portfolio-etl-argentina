@@ -1,0 +1,62 @@
+name: Pipeline ETL Diario
+
+on:
+  schedule:
+    # 13:00 UTC = 10:00 Argentina (UTC-3, sin horario de verano)
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:  # permite correrlo a mano desde la pestaña Actions
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Escribir credencial de GCP
+        run: echo '${{ secrets.GCP_SA_KEY }}' > gcp-key.json
+
+      - name: Correr extractores
+        working-directory: extraction
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_DATASET_RAW: ${{ secrets.GCP_DATASET_RAW }}
+          GCP_DATASET_ANALYTICS: ${{ secrets.GCP_DATASET_ANALYTICS }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+        run: |
+          python extract_riesgo_pais.py
+          python extract_dolar.py
+          python extract_inflacion.py
+          python extract_bcra.py
+
+      - name: Escribir profiles.yml de dbt
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << EOF
+          portfolio_etl_argentina:
+            target: dev
+            outputs:
+              dev:
+                type: bigquery
+                method: service-account
+                project: ${{ secrets.GCP_PROJECT_ID }}
+                dataset: ${{ secrets.GCP_DATASET_ANALYTICS }}
+                threads: 4
+                keyfile: ${{ github.workspace }}/gcp-key.json
+                location: US
+          EOF
+
+      - name: dbt run
+        working-directory: dbt_project/de_challenge_ar
+        run: |
+          dbt deps || true
+          dbt run
