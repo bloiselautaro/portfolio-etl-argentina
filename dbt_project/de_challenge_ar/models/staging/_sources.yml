@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw_economy
+    database: portfolio-etl-argentina
+    schema: raw_economy
+    tables:
+      - name: raw_riesgo_pais
+      - name: raw_dolar
+      - name: raw_inflacion
+      - name: raw_reservas_bcra
+      - name: raw_tasa_politica_monetaria

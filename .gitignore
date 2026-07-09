@@ -9,9 +9,11 @@ __pycache__/
 *.pyc
 
 # Archivos temporales de dbt
-dbt_project/target/
-dbt_project/dbt_packages/
-dbt_project/logs/
+dbt_project/**/target/
+dbt_project/**/dbt_packages/
+dbt_project/**/logs/
 
 # Notas internas de trabajo
 docs/CONTEXT.md
+
+/logs/
