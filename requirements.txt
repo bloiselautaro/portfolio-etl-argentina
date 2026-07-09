@@ -4,3 +4,4 @@ google-cloud-bigquery
 pyarrow
 dbt-bigquery
 python-dotenv
+protobuf<5,>=4.25.3
