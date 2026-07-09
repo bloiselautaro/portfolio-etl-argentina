@@ -2,7 +2,7 @@ name: Pipeline ETL Diario
 
 on:
   schedule:
-    # 13:00 UTC = 10:00 Argentina (UTC-3, sin horario de verano)
+    # 13:00 UTC = 10:00 Argentina (UTC-3)
     - cron: '0 13 * * 1-5'
   workflow_dispatch:  # permite correrlo a mano desde la pestaña Actions
 
@@ -57,6 +57,8 @@ jobs:
 
       - name: dbt run
         working-directory: dbt_project/de_challenge_ar
+        env:
+          DBT_SEND_ANONYMOUS_USAGE_STATS: "False"
         run: |
           dbt deps || true
           dbt run
