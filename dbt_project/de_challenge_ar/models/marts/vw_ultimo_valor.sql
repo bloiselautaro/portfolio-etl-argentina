@@ -6,18 +6,6 @@ qualify row_number() over (order by fecha desc) = 1
 
 union all
 
-select 'dolar_oficial', fecha, dolar_oficial
-from {{ ref('mart_brecha_cambiaria') }}
-qualify row_number() over (order by fecha desc) = 1
-
-union all
-
-select 'dolar_blue', fecha, dolar_blue
-from {{ ref('mart_brecha_cambiaria') }}
-qualify row_number() over (order by fecha desc) = 1
-
-union all
-
 select 'brecha_cambiaria_pct', fecha, brecha_cambiaria_pct
 from {{ ref('mart_brecha_cambiaria') }}
 qualify row_number() over (order by fecha desc) = 1
@@ -39,3 +27,9 @@ union all
 select 'tasa_politica_monetaria_pct', fecha, tasa_politica_monetaria_pct
 from {{ ref('fct_tasa_politica_monetaria') }}
 qualify row_number() over (order by fecha desc) = 1
+
+union all
+
+select concat('dolar_', tipo_dolar) as indicador, fecha, precio_venta as valor
+from {{ ref('stg_dolar') }}
+qualify row_number() over (partition by tipo_dolar order by fecha desc) = 1
