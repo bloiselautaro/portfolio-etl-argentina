@@ -3,13 +3,8 @@ name: Pipeline ETL Diario
 on:
   schedule:
     # 13:17 UTC = 10:17 Argentina (UTC-3)
-    # Nota: se corrió el minuto de :00 a :17 a propósito. Los cron jobs
-    # programados justo "en punto" (minuto 0) son los de mayor carga en
-    # la infraestructura de GitHub Actions, lo que genera demoras de hasta
-    # más de 1 hora en el disparo real. Correrlo en un minuto arbitrario
-    # distinto de :00 esquiva ese pico de congestión.
     - cron: '17 13 * * 1-5'
-  workflow_dispatch:  # permite correrlo a mano desde la pestaña Actions
+  workflow_dispatch:  
 
 jobs:
   run-pipeline:
