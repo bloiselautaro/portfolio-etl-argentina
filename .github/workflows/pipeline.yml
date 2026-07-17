@@ -2,9 +2,12 @@ name: Pipeline ETL Diario
 
 on:
   schedule:
-    # corre a las 21:17 ART (00:17 UTC del día siguiente), después del
-    # cierre del mercado cambiario, para no capturar el dato de ayer
-    - cron: '17 0 * * 2-6'
+    - cron: '17 11 * * 1-5'  # 08:17 ART
+    - cron: '17 14 * * 1-5'  # 11:17 ART
+    - cron: '17 17 * * 1-5'  # 14:17 ART
+    - cron: '17 20 * * 1-5'  # 17:17 ART
+    - cron: '17 23 * * 1-5'  # 20:17 ART
+    - cron: '17 2 * * 2-6'   # 23:17 ART (cruza medianoche UTC, por eso cambia el rango de días)
   workflow_dispatch:
 
 jobs:
