@@ -30,6 +30,12 @@ qualify row_number() over (order by fecha desc) = 1
 
 union all
 
+select 'reservas_variacion_diaria_pct', fecha, variacion_diaria_pct
+from {{ ref('fct_reservas_bcra') }}
+qualify row_number() over (order by fecha desc) = 1
+
+union all
+
 select 'tasa_politica_monetaria_pct', fecha, tasa_politica_monetaria_pct
 from {{ ref('fct_tasa_politica_monetaria') }}
 qualify row_number() over (order by fecha desc) = 1
