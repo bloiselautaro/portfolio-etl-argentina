@@ -2,21 +2,59 @@ import requests
 from google.cloud import bigquery
 from config import get_bigquery_client, PROJECT_ID, DATASET_RAW
 
-API_URL = "https://api.argentinadatos.com/v1/cotizaciones/dolares"
+API_HISTORICO = "https://api.argentinadatos.com/v1/cotizaciones/dolares"
+API_ACTUAL = "https://dolarapi.com/v1/dolares"
 TABLE_NAME = "raw_dolar"
 
-
-def fetch_dolar() -> list[dict]:
-    """Trae el historial completo de cotizaciones de dólar desde ArgentinaDatos."""
-    response = requests.get(API_URL, timeout=30)
+def fetch_dolar_historico() -> list[dict]:
+    """Trae el historial completo desde ArgentinaDatos."""
+    response = requests.get(API_HISTORICO, timeout=30)
     response.raise_for_status()
     data = response.json()
-    print(f"Registros obtenidos de la API: {len(data)}")
+    print(f"Registros históricos obtenidos: {len(data)}")
     return data
 
+def fetch_dolar_intradia() -> list[dict]:
+    """Trae las cotizaciones al instante directo desde DolarAPI."""
+    response = requests.get(API_ACTUAL, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    
+    registros_actuales = []
+    for d in data:
+        # DolarAPI usa formato "2026-07-22T13:00:00.000Z". Cortamos a "YYYY-MM-DD"
+        fecha_corta = d["fechaActualizacion"][0:10]
+        registro = {
+            "casa": d["casa"],
+            "compra": d["compra"],
+            "venta": d["venta"],
+            "fecha": fecha_corta
+        }
+        registros_actuales.append(registro)
+        
+    print(f"Registros actuales (intradía) obtenidos: {len(registros_actuales)}")
+    return registros_actuales
+
+def combinar_y_deduplicar(historico: list[dict], actual: list[dict]) -> list[dict]:
+    """Combina listas pisando el dato histórico de hoy con el dato real de hoy."""
+    datos_combinados = {}
+    
+    # Metemos todo el histórico
+    for h in historico:
+        clave = (h["casa"], h["fecha"])
+        datos_combinados[clave] = h
+        
+    # Metemos lo actual (si hoy ya existía en el histórico, lo sobreescribe)
+    for a in actual:
+        clave = (a["casa"], a["fecha"])
+        datos_combinados[clave] = a
+        
+    lista_final = list(datos_combinados.values())
+    print(f"Total de registros listos para cargar: {len(lista_final)}")
+    return lista_final
 
 def load_to_bigquery(rows: list[dict]) -> None:
-    """Carga el historial completo a BigQuery, reemplazando la tabla raw."""
+    """Carga el historial actualizado a BigQuery, reemplazando la tabla raw."""
     client = get_bigquery_client()
     table_id = f"{PROJECT_ID}.{DATASET_RAW}.{TABLE_NAME}"
 
@@ -32,7 +70,8 @@ def load_to_bigquery(rows: list[dict]) -> None:
     table = client.get_table(table_id)
     print(f"✅ Cargado en {table_id}: {table.num_rows} filas.")
 
-
 if __name__ == "__main__":
-    rows = fetch_dolar()
+    historico = fetch_dolar_historico()
+    actual = fetch_dolar_intradia()
+    rows = combinar_y_deduplicar(historico, actual)
     load_to_bigquery(rows)
