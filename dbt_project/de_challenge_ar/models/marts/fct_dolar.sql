@@ -9,9 +9,9 @@ with base as (
 
 ),
 
--- marca el precio solo en las filas donde realmente cambió respecto
--- al día anterior (o es la primera fila de esa serie)
-cambios as (
+-- marca con 1 cada fila donde el precio realmente cambió respecto al
+-- día anterior (o es la primera fila de esa serie de tipo_dolar)
+marca_cambios as (
 
     select
         fecha,
@@ -21,27 +21,59 @@ cambios as (
         case
             when precio_venta != lag(precio_venta) over (partition by tipo_dolar order by fecha)
                 or lag(precio_venta) over (partition by tipo_dolar order by fecha) is null
-            then precio_venta
-        end as precio_en_dia_de_cambio
+            then 1
+            else 0
+        end as es_cambio
     from base
 
 ),
 
--- para cada fila, busca el último precio distinto anterior (saltea
--- los días donde la fuente repitió el mismo valor sin actualizar)
-con_ultimo_valor_distinto as (
+-- contador que sube 1 en cada cambio real y se mantiene igual mientras
+-- el precio no cambie: agrupa cada "racha" de precio plano bajo un mismo id
+con_streak as (
 
     select
         fecha,
         tipo_dolar,
         precio_compra,
         precio_venta,
-        last_value(precio_en_dia_de_cambio ignore nulls) over (
+        sum(es_cambio) over (
             partition by tipo_dolar
             order by fecha
-            rows between unbounded preceding and 1 preceding
-        ) as precio_ultimo_valor_distinto
-    from cambios
+            rows unbounded preceding
+        ) as streak_id
+    from marca_cambios
+
+),
+
+-- un valor único de venta por cada racha (todas las filas de una racha
+-- comparten el mismo precio_venta, así que min/max/any da lo mismo)
+valor_por_streak as (
+
+    select
+        tipo_dolar,
+        streak_id,
+        min(precio_venta) as precio_venta_streak
+    from con_streak
+    group by tipo_dolar, streak_id
+
+),
+
+-- cada fila se compara contra el valor de la racha ANTERIOR (streak_id - 1),
+-- sin importar cuántos días lleve "planchado" el valor actual
+comparado as (
+
+    select
+        c.fecha,
+        c.tipo_dolar,
+        c.precio_compra,
+        c.precio_venta,
+        c.streak_id,
+        v_prev.precio_venta_streak as precio_ultimo_valor_distinto
+    from con_streak c
+    left join valor_por_streak v_prev
+        on c.tipo_dolar = v_prev.tipo_dolar
+        and c.streak_id - 1 = v_prev.streak_id
 
 )
 
@@ -59,12 +91,13 @@ select
         lag(precio_venta) over (partition by tipo_dolar order by fecha)
     ) * 100, 2) as variacion_diaria_pct,
 
-    -- variación respecto al último valor realmente distinto (ignora
-    -- días "planchados" por falta de actualización de la fuente)
+    -- variación respecto al último valor realmente distinto (streak anterior);
+    -- soluciona el bug de porcentajes disparatados cuando pasan 2+ días
+    -- sin cambio (ej. fines de semana)
     precio_venta - precio_ultimo_valor_distinto as variacion_desde_ultimo_cambio,
     round(safe_divide(
         precio_venta - precio_ultimo_valor_distinto,
         precio_ultimo_valor_distinto
     ) * 100, 2) as variacion_desde_ultimo_cambio_pct
 
-from con_ultimo_valor_distinto
+from comparado

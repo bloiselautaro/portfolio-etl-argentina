@@ -7,9 +7,9 @@ with base as (
 
 ),
 
--- marca el valor solo en las filas donde realmente cambió respecto
--- al día anterior (o es la primera fila de la serie)
-cambios as (
+-- marca con 1 cada fila donde el valor realmente cambió respecto al
+-- día anterior (o es la primera fila de la serie)
+marca_cambios as (
 
     select
         fecha,
@@ -17,24 +17,52 @@ cambios as (
         case
             when reservas_millones_usd != lag(reservas_millones_usd) over (order by fecha)
                 or lag(reservas_millones_usd) over (order by fecha) is null
-            then reservas_millones_usd
-        end as valor_en_dia_de_cambio
+            then 1
+            else 0
+        end as es_cambio
     from base
 
 ),
 
--- para cada fila, busca el último valor distinto anterior (saltea
--- los días donde la fuente repitió el mismo valor sin actualizar)
-con_ultimo_valor_distinto as (
+-- contador que sube 1 en cada cambio real y se mantiene igual mientras
+-- el valor no cambie: agrupa cada "racha" de valor plano bajo un mismo id
+con_streak as (
 
     select
         fecha,
         reservas_millones_usd,
-        last_value(valor_en_dia_de_cambio ignore nulls) over (
+        sum(es_cambio) over (
             order by fecha
-            rows between unbounded preceding and 1 preceding
-        ) as valor_ultimo_valor_distinto
-    from cambios
+            rows unbounded preceding
+        ) as streak_id
+    from marca_cambios
+
+),
+
+-- un valor único por cada racha (todas las filas de una racha comparten
+-- el mismo reservas_millones_usd, así que min/max/any da lo mismo)
+valor_por_streak as (
+
+    select
+        streak_id,
+        min(reservas_millones_usd) as reservas_streak
+    from con_streak
+    group by streak_id
+
+),
+
+-- cada fila se compara contra el valor de la racha ANTERIOR (streak_id - 1),
+-- sin importar cuántos días lleve "planchado" el valor actual
+comparado as (
+
+    select
+        c.fecha,
+        c.reservas_millones_usd,
+        c.streak_id,
+        v_prev.reservas_streak as valor_ultimo_valor_distinto
+    from con_streak c
+    left join valor_por_streak v_prev
+        on c.streak_id - 1 = v_prev.streak_id
 
 )
 
@@ -50,12 +78,13 @@ select
         lag(reservas_millones_usd) over (order by fecha)
     ) * 100, 2) as variacion_diaria_pct,
 
-    -- variación respecto al último valor realmente distinto (ignora
-    -- días "planchados" por falta de actualización de la fuente)
+    -- variación respecto al último valor realmente distinto (streak anterior);
+    -- soluciona el bug de porcentajes disparatados cuando pasan varios días
+    -- hábiles seguidos sin publicación (rezago real de BCRA)
     reservas_millones_usd - valor_ultimo_valor_distinto as variacion_desde_ultimo_cambio_millones_usd,
     round(safe_divide(
         reservas_millones_usd - valor_ultimo_valor_distinto,
         valor_ultimo_valor_distinto
     ) * 100, 2) as variacion_desde_ultimo_cambio_pct
 
-from con_ultimo_valor_distinto
+from comparado

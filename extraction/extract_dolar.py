@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 import requests
 from google.cloud import bigquery
 from config import get_bigquery_client, PROJECT_ID, DATASET_RAW
@@ -5,6 +6,7 @@ from config import get_bigquery_client, PROJECT_ID, DATASET_RAW
 API_HISTORICO = "https://api.argentinadatos.com/v1/cotizaciones/dolares"
 API_ACTUAL = "https://dolarapi.com/v1/dolares"
 TABLE_NAME = "raw_dolar"
+TZ_ARGENTINA = timezone(timedelta(hours=-3))
 
 def fetch_dolar_historico() -> list[dict]:
     """Trae el historial completo desde ArgentinaDatos."""
@@ -22,13 +24,17 @@ def fetch_dolar_intradia() -> list[dict]:
     
     registros_actuales = []
     for d in data:
-        # DolarAPI usa formato "2026-07-22T13:00:00.000Z". Cortamos a "YYYY-MM-DD"
-        fecha_corta = d["fechaActualizacion"][0:10]
+        # DolarAPI devuelve la fecha en UTC (ej. "2026-07-22T01:30:00.000Z").
+        # Hay que convertir a hora Argentina antes de extraer la fecha, porque
+        # cortar el string a mano asume que UTC y ART caen el mismo día, y eso
+        # falla en el rango 21hs-24hs ART (madrugada UTC del día siguiente).
+        timestamp_utc = datetime.fromisoformat(d["fechaActualizacion"].replace("Z", "+00:00"))
+        fecha_argentina = timestamp_utc.astimezone(TZ_ARGENTINA).strftime("%Y-%m-%d")
         registro = {
             "casa": d["casa"],
             "compra": d["compra"],
             "venta": d["venta"],
-            "fecha": fecha_corta
+            "fecha": fecha_argentina
         }
         registros_actuales.append(registro)
         
