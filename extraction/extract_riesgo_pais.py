@@ -27,7 +27,7 @@ def load_to_bigquery(rows: list[dict]) -> None:
     )
 
     load_job = client.load_table_from_json(rows, table_id, job_config=job_config)
-    load_job.result()  # espera a que termine el job
+    load_job.result()  
 
     table = client.get_table(table_id)
     print(f"✅ Cargado en {table_id}: {table.num_rows} filas.")

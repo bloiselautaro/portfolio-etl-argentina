@@ -70,18 +70,9 @@ select
     fecha,
     reservas_millones_usd,
 
-    -- variación día a día tal cual viene la fuente (puede dar 0.00%
-    -- varios días seguidos si la fuente no actualizó el dato)
-    reservas_millones_usd - lag(reservas_millones_usd) over (order by fecha) as variacion_diaria_millones_usd,
-    round(safe_divide(
-        reservas_millones_usd - lag(reservas_millones_usd) over (order by fecha),
-        lag(reservas_millones_usd) over (order by fecha)
-    ) * 100, 2) as variacion_diaria_pct,
-
     -- variación respecto al último valor realmente distinto (streak anterior);
     -- soluciona el bug de porcentajes disparatados cuando pasan varios días
     -- hábiles seguidos sin publicación (rezago real de BCRA)
-    reservas_millones_usd - valor_ultimo_valor_distinto as variacion_desde_ultimo_cambio_millones_usd,
     round(safe_divide(
         reservas_millones_usd - valor_ultimo_valor_distinto,
         valor_ultimo_valor_distinto

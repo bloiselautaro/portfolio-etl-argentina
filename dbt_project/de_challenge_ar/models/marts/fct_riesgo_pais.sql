@@ -70,18 +70,9 @@ select
     fecha,
     riesgo_pais,
 
-    -- variación día a día tal cual viene la fuente (puede dar 0.00%
-    -- varios días seguidos si la fuente no actualizó el dato)
-    riesgo_pais - lag(riesgo_pais) over (order by fecha) as variacion_diaria,
-    round(safe_divide(
-        riesgo_pais - lag(riesgo_pais) over (order by fecha),
-        lag(riesgo_pais) over (order by fecha)
-    ) * 100, 2) as variacion_diaria_pct,
-
     -- variación respecto al último valor realmente distinto (streak anterior);
     -- soluciona el bug de porcentajes disparatados cuando pasan 2+ días
     -- sin cambio (ej. fines de semana)
-    riesgo_pais - valor_ultimo_valor_distinto as variacion_desde_ultimo_cambio,
     round(safe_divide(
         riesgo_pais - valor_ultimo_valor_distinto,
         valor_ultimo_valor_distinto

@@ -3,7 +3,6 @@ with base as (
     select
         fecha,
         tipo_dolar,
-        precio_compra,
         precio_venta
     from {{ ref('stg_dolar') }}
 
@@ -16,7 +15,6 @@ marca_cambios as (
     select
         fecha,
         tipo_dolar,
-        precio_compra,
         precio_venta,
         case
             when precio_venta != lag(precio_venta) over (partition by tipo_dolar order by fecha)
@@ -35,7 +33,6 @@ con_streak as (
     select
         fecha,
         tipo_dolar,
-        precio_compra,
         precio_venta,
         sum(es_cambio) over (
             partition by tipo_dolar
@@ -66,7 +63,6 @@ comparado as (
     select
         c.fecha,
         c.tipo_dolar,
-        c.precio_compra,
         c.precio_venta,
         c.streak_id,
         v_prev.precio_venta_streak as precio_ultimo_valor_distinto
@@ -80,21 +76,11 @@ comparado as (
 select
     fecha,
     tipo_dolar,
-    precio_compra,
     precio_venta,
-
-    -- variación día a día tal cual viene la fuente (puede dar 0.00%
-    -- varios días seguidos si la fuente no actualizó ese tipo de dólar)
-    precio_venta - lag(precio_venta) over (partition by tipo_dolar order by fecha) as variacion_diaria,
-    round(safe_divide(
-        precio_venta - lag(precio_venta) over (partition by tipo_dolar order by fecha),
-        lag(precio_venta) over (partition by tipo_dolar order by fecha)
-    ) * 100, 2) as variacion_diaria_pct,
 
     -- variación respecto al último valor realmente distinto (streak anterior);
     -- soluciona el bug de porcentajes disparatados cuando pasan 2+ días
     -- sin cambio (ej. fines de semana)
-    precio_venta - precio_ultimo_valor_distinto as variacion_desde_ultimo_cambio,
     round(safe_divide(
         precio_venta - precio_ultimo_valor_distinto,
         precio_ultimo_valor_distinto
