@@ -6,7 +6,6 @@ BASE_URL = "https://api.bcra.gob.ar/estadisticas/v4.0"
 
 VARIABLES_OBJETIVO = {
     "raw_reservas_bcra": "reservas internacionales",
-    "raw_tasa_politica_monetaria": "tasas de interés de política monetaria",
 }
 
 
